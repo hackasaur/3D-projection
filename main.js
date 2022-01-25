@@ -17,45 +17,47 @@ function main() {
             return [point2D[0], -1 * point2D[1]]
         }
 
-        // let planeNormal = vector3D.createPoint3D(0, 1, 0)
-        // let vertex3D = vector3D.createPoint3D(100, 0, 100)
-        // let cameraOrientation = vector3D.unitVector(vector3D.createPoint3D(1, 0, 0))
-        // let pointOnXAxis = vector3D.createPoint3D(1, 5, 0)
-        // let projected2DPoint = projection3D.vertex3DTo2Dprojection(vertex3D, origin3D, planeNormal, cameraOrientation)
-
         let focalPoint3D = vector3D.createPoint3D(0, 0, 0)
         let origin3D = vector3D.createPoint3D(5, 5, 0)
 
-        let points3D = []
-        let size = 500
+
+        let vertices = []
+        // let size = 500
         // for (let i = 0; i < 10; i++) {
         //     points3D.push([size * Math.random() - 200, size * Math.random() - 200, size * Math.random() - 200])
         // }
 
-        points3D.push([100, -100, 100], [100, -100, -100], [100, 100, 100], [100, 100,-100], 
+        vertices.push(
+            [100, -100, 100], [100, -100, -100], [100, 100, 100], [100, 100, -100],
             [-100, 100, 100], [-100, 100, -100], [-100, -100, 100], [-100, -100, -100])
 
-        function movePointByTheta(point3D, center3D, horizontalTheta, verticalTheta) {
+        let edges = [
+            [0, 1], [0, 2], [0, 6],
+            [5, 4], [5, 3], [5, 7],
+            [6, 7], [6, 4], [3, 2],
+            [3, 1], [2, 4], [1, 7]
+
+        ]
+
+        function movePointByTheta(point3D, center3D, angle) {
             let radius = vector3D.distanceBetweenPoints(center3D, point3D)
-            // console.log('radius', radius)
-            point3D[0] = center3D[0] + radius * Math.cos(horizontalTheta) * Math.cos(verticalTheta)
-            point3D[1] = center3D[1] + radius * Math.sin(horizontalTheta) * Math.cos(verticalTheta)
-            point3D[2] = center3D[2] + radius * Math.sin(verticalTheta)
+            point3D[0] = center3D[0] + radius * Math.cos(angle[1]) * Math.sin(angle[0])
+            point3D[1] = center3D[1] + radius * Math.cos(angle[1]) * Math.cos(angle[0])
+            point3D[2] = center3D[2] + radius * Math.sin(angle[1])
         }
 
-        const view = (points3D, origin3D, focalPoint3D) => {
+        const view = (vertices, edges, origin3D, focalPoint3D) => {
             let points2D = []
             let orbiting = false
-            let mouseCoords = []
             let normal = vector3D.unitVector(vector3D.subtractVectors(focalPoint3D, origin3D))
             let cameraOrient = vector3D.unitVector(vector3D.crossProduct(vector3D.createPoint3D(0, 0, 1), normal))
-            let thetaVertical = 0
-            let thetaHorizontal = 0
-            let deltaTheta = 0.02
+            let angles = [0, 0]
+            let delta = 0.02
+            let mouseCoords = []
 
             console.log('cameraOrient', cameraOrient)
             console.log('normal', vector3D.unitVector(vector3D.subtractVectors(focalPoint3D, origin3D)))
-            console.log('origin', origin3D)
+            console.log('origin3D', origin3D)
 
             canvas.addEventListener('mouseup', () => {
                 orbiting = false
@@ -69,33 +71,34 @@ function main() {
 
             canvas.addEventListener('mousemove', (event) => {
                 if (orbiting) {
-                    // console.log('origin3D', origin3D)
-                    thetaHorizontal += deltaTheta
-                    thetaVertical += deltaTheta
-                    movePointByTheta(origin3D, focalPoint3D, thetaHorizontal, thetaVertical)
+                    angles[0] += (event.x - mouseCoords[0]) * delta
+                    angles[1] += (event.y - mouseCoords[1]) * delta
+                    movePointByTheta(origin3D, focalPoint3D, angles)
                     normal = vector3D.unitVector(vector3D.subtractVectors(focalPoint3D, origin3D))
                     cameraOrient = vector3D.unitVector(vector3D.crossProduct(vector3D.createPoint3D(0, 0, 1), normal))
                 }
-                // mouseCoords[0] = event.x
-                // mouseCoords[1] = event.y
+                mouseCoords[0] = event.x
+                mouseCoords[1] = event.y
             })
 
             canvas.addEventListener('mousedown', (event) => {
                 orbiting = true
             })
 
-            for (let point3D of points3D) {
-                points2D.push(projection3D.vertex3DTo2Dprojection(point3D, origin3D, focalPoint3D, cameraOrient))
+            for (let vertex of vertices) {
+                points2D.push(projection3D.vertex3DTo2Dprojection(vertex, origin3D, focalPoint3D, cameraOrient))
             }
 
             console.log(points2D)
             function animationLoop() {
                 if (orbiting) {
                     points2D = []
-                    for (let point3D of points3D) {
-                        points2D.push(projection3D.vertex3DTo2Dprojection(point3D, origin3D, focalPoint3D, cameraOrient))
+
+                    for (let vertex of vertices) {
+                        points2D.push(projection3D.vertex3DTo2Dprojection(vertex, origin3D, focalPoint3D, cameraOrient))
                     }
                 }
+
                 ctx.clearRect(-1 * ctx.canvas.width / 2, -1 * ctx.canvas.height / 2, ctx.canvas.width, ctx.canvas.height)
 
                 for (let point2D of points2D) {
@@ -111,14 +114,22 @@ function main() {
                     gradient.addColorStop(1, 'gray');
                     ctx.fillStyle = gradient
                     ctx.fill()
-
                 }
+
+                for (let edge of edges) {
+                    ctx.beginPath()
+                    ctx.moveTo(points2D[edge[0]][0], -1 * points2D[edge[0]][1])
+                    ctx.lineTo(points2D[edge[1]][0], -1 * points2D[edge[1]][1])
+                    ctx.stroke()
+                    ctx.closePath()
+                }
+                ctx.strokeStyle = 'white'
                 requestAnimationFrame(animationLoop)
             }
             animationLoop()
         }
 
-        view(points3D, origin3D, focalPoint3D)
+        view(vertices, edges, origin3D, focalPoint3D)
     }
 }
 window.addEventListener('load', main)
